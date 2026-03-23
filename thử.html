@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HSK2 Vocabulary Quiz</title>
+    <style>
+        :root { --primary: #1a73e8; --success: #28a745; --error: #dc3545; --bg: #f0f2f5; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; margin: 0; }
+        .container { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 600px; }
+        .header { text-align: center; border-bottom: 2px solid #eee; margin-bottom: 20px; padding-bottom: 10px; }
+        .progress { font-size: 0.9rem; color: #666; margin-bottom: 10px; }
+        .question { font-size: 1.25rem; font-weight: 600; margin-bottom: 20px; line-height: 1.6; color: #333; }
+        .options { display: grid; gap: 12px; }
+        button { 
+            padding: 15px; border: 2px solid #e0e0e0; border-radius: 12px; background: white;
+            cursor: pointer; text-align: left; transition: all 0.2s; font-size: 1.1rem;
+        }
+        button:hover:not(:disabled) { border-color: var(--primary); background: #f8fbff; }
+        button.correct { background: #d4edda !important; border-color: var(--success) !important; color: #155724; font-weight: bold; }
+        button.wrong { background: #f8d7da !important; border-color: var(--error) !important; color: #721c24; }
+        .feedback { margin-top: 20px; padding: 15px; border-radius: 10px; display: none; line-height: 1.5; }
+        .feedback.show { display: block; background: #e8f0fe; border-left: 5px solid var(--primary); }
+        .next-btn { 
+            margin-top: 20px; width: 100%; padding: 15px; background: var(--primary); color: white; 
+            border: none; border-radius: 12px; font-weight: bold; cursor: pointer; display: none;
+        }
+        .next-btn:show { display: block; }
+        .final-score { text-align: center; display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="quiz-box">
+        <div class="header">
+            <h3>HSK2 词汇练习 (20 câu)</h3>
+            <div class="progress">Câu hỏi: <span id="current-idx">1</span>/20</div>
+        </div>
+        <div id="question-text" class="question"></div>
+        <div id="options-box" class="options"></div>
+        <div id="feedback-box" class="feedback"></div>
+        <button id="next-button" class="next-btn" onclick="loadNextQuestion()">Câu tiếp theo</button>
+    </div>
+    <div id="result-box" class="final-score">
+        <h2>🎉 Hoàn thành!</h2>
+        <p id="score-text" style="font-size: 1.5rem;"></p>
+        <button onclick="location.reload()" class="next-btn" style="display:block">Làm lại từ đầu</button>
+    </div>
+</div>
+
+<script>
+    const quizData = [
+        { q: "他唱歌唱得非常好。Từ '唱歌' (chànggē) nghĩa là gì?", a: ["Khiêu vũ", "Hát", "Nghe nhạc", "Nói chuyện"], c: 1, e: "唱歌 (chànggē): Hát/Ca hát." },
+        { q: "晚上我们去_______唱歌吧。", a: ["学校", "歌厅", "饭馆", "商店"], c: 1, e: "歌厅 (gētīng): Phòng hát/Karaoke." },
+        { q: "这件衣服比那件_______。", a: ["便宜", "意思", "可能", "觉得"], c: 0, e: "便宜 (piányi): Rẻ. Cấu trúc so sánh: A 比 B + Tính từ." },
+        { q: "那个西瓜太_______了，要50块钱。", a: ["小", "便宜", "贵", "甜"], c: 2, e: "贵 (guì): Đắt. 50 đồng cho 1 quả dưa là khá đắt." },
+        { q: "教室里没有人，大家都在外面_______。", a: ["说话", "睡觉", "洗澡", "写字"], c: 0, e: "说话 (shuōhuà): Nói chuyện." },
+        { q: "你看见我的_______了吗？我想喝汤。", a: ["筷子", "勺子", "叉子", "刀子"], c: 1, e: "勺子 (sháozi): Cái thìa/muỗng (dùng để uống canh - 喝汤)." },
+        { q: "中国人吃饭习惯用_______。", a: ["刀子", "叉子", "筷子", "勺子"], c: 2, e: "筷子 (kuàizi): Đũa." },
+        { q: "西方的孩子喜欢用_______吃肉。", a: ["盘子", "刀子和叉子", "碗", "勺子"], c: 1, e: "刀子 (dāozi) và 叉子 (chāzi): Dao và dĩa." },
+        { q: "药太_______了，我不喜欢吃。", a: ["甜", "苦", "辣", "咸"], c: 1, e: "苦 (kǔ): Đắng (thường nói về thuốc - 药)." },
+        { q: "这个苹果非常_______，很好吃。", a: ["酸", "苦", "辣", "甜"], c: 3, e: "甜 (tián): Ngọt." },
+        { q: "如果你喜欢吃_______的，就多放点辣椒(lājiāo)。", a: ["咸", "辣", "苦", "酸"], c: 1, e: "辣 (là): Cay. 辣椒 là ớt." },
+        { q: "这种醋(cù)很_______。", a: ["酸", "甜", "咸", "辣"], c: 0, e: "酸 (suān): Chua (Giấm - 醋 có vị chua)." },
+        { q: "盐(yán)放多了，菜太_______了。", a: ["甜", "咸", "苦", "酸"], c: 1, e: "咸 (xián): Mặn. 盐 là muối." },
+        { q: "请把菜放在_______里。", a: ["勺子", "叉子", "盘子", "筷子"], c: 2, e: "盘子 (pánzi): Cái đĩa." },
+        { q: "这个饭_______太小了，再给我一个大的。", a: ["碗", "刀子", "筷子", "勺子"], c: 0, e: "碗 (wǎn): Cái bát." },
+        { q: "我的姐姐有三个_______。", a: ["大人", "孩子", "工作", "身体"], c: 1, e: "孩子 (háizi): Trẻ con/Con cái." },
+        { q: "今天下大雨，他_______不来了。", a: ["能", "可能", "可以", "会"], c: 1, e: "可能 (kěnéng): Có thể/Có khả năng (chỉ sự phán đoán)." },
+        { q: "我的哥哥_______我高得多。", a: ["比", "和", "跟", "在"], c: 0, e: "Cấu trúc so sánh: A 比 B + Tính từ." },
+        { q: "哪个字的意思是 'Cái dĩa'?", a: ["勺子", "筷子", "叉子", "盘子"], c: 2, e: "叉子 (chāzi) là cái dĩa." },
+        { q: "哪个字的意思是 'Nói chuyện'?", a: ["唱歌", "说话", "跳舞", "听力"], c: 1, e: "说话 (shuōhuà) là nói chuyện." }
+    ];
+
+    let currentIdx = 0;
+    let score = 0;
+
+    function loadQuestion() {
+        const q = quizData[currentIdx];
+        document.getElementById('current-idx').innerText = currentIdx + 1;
+        document.getElementById('question-text').innerText = q.q;
+        const optionsBox = document.getElementById('options-box');
+        optionsBox.innerHTML = '';
+        
+        q.a.forEach((opt, i) => {
+            const btn = document.createElement('button');
+            btn.innerText = opt;
+            btn.onclick = () => checkAnswer(i);
+            optionsBox.appendChild(btn);
+        });
+
+        document.getElementById('feedback-box').classList.remove('show');
+        document.getElementById('next-button').style.display = 'none';
+    }
+
+    function checkAnswer(selected) {
+        const q = quizData[currentIdx];
+        const buttons = document.querySelectorAll('.options button');
+        buttons.forEach(btn => btn.disabled = true);
+
+        if (selected === q.c) {
+            buttons[selected].classList.add('correct');
+            score++;
+        } else {
+            buttons[selected].classList.add('wrong');
+            buttons[q.c].classList.add('correct');
+        }
+
+        const feedback = document.getElementById('feedback-box');
+        feedback.innerHTML = `<strong>Giải thích:</strong> ${q.e}`;
+        feedback.classList.add('show');
+        document.getElementById('next-button').style.display = 'block';
+    }
+
+    function loadNextQuestion() {
+        currentIdx++;
+        if (currentIdx < quizData.length) {
+            loadQuestion();
+        } else {
+            showResult();
+        }
+    }
+
+    function showResult() {
+        document.getElementById('quiz-box').style.display = 'none';
+        const resultBox = document.getElementById('result-box');
+        resultBox.style.display = 'block';
+        document.getElementById('score-text').innerText = `Bạn trả lời đúng ${score}/20 câu!`;
+    }
+
+    loadQuestion();
+</script>
+
+</body>
+</html>
